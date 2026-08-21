@@ -1,0 +1,328 @@
+{
+  "name": "Lead Generation - Email Finder & Enrichment (Snov.io)",
+  "nodes": [
+    {
+      "parameters": {
+        "path": "0f9c3413-21ce-4a22-a448-433cbd0a516d",
+        "formTitle": "Email Finder",
+        "formDescription": "Enter a company website to find and verify email addresses for that business.",
+        "formFields": {
+          "values": [
+            {
+              "fieldLabel": "Company Website",
+              "placeholder": "e.g. dentalaesthetics.pk or https://dentalaesthetics.pk",
+              "requiredField": true
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "1da6bca3-64f4-4d2f-afea-1a1c589c36d0",
+      "name": "Email Finder Form",
+      "type": "n8n-nodes-base.formTrigger",
+      "typeVersion": 2,
+      "position": [
+        0,
+        0
+      ],
+      "webhookId": "0f9c3413-21ce-4a22-a448-433cbd0a516d"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.snov.io/v1/oauth/access_token",
+        "sendBody": true,
+        "contentType": "form-urlencoded",
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "grant_type",
+              "value": "client_credentials"
+            },
+            {
+              "name": "client_id",
+              "value": "YOUR_SNOV_CLIENT_ID"
+            },
+            {
+              "name": "client_secret",
+              "value": "YOUR_SNOV_CLIENT_SECRET"
+            }
+          ]
+        },
+        "options": {
+          "timeout": 30000
+        }
+      },
+      "id": "5d3f340d-abc0-47f9-9e15-197242f3bae3",
+      "name": "Get Snov Access Token",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        240,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.snov.io/v2/domain-search/domain-emails/start",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{$json[\"access_token\"]}}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "form-urlencoded",
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "domain",
+              "value": "={{ $('Email Finder Form').item.json[\"Company Website\"].replace(/^https?:\\/\\//, '').replace(/^www\\./, '').replace(/\\/$/, '') }}"
+            }
+          ]
+        },
+        "options": {
+          "timeout": 30000
+        }
+      },
+      "id": "61478a95-33a7-44ee-8ade-f52bff41d4aa",
+      "name": "Start Domain Search",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        480,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "amount": 30
+      },
+      "id": "951f6297-84da-4785-b5f6-ca072bbed01d",
+      "name": "Wait for Snov to Process",
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [
+        720,
+        0
+      ],
+      "webhookId": "wait-node-webhook"
+    },
+    {
+      "parameters": {
+        "url": "={{ $('Start Domain Search').item.json.links.result }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{$('Get Snov Access Token').item.json[\"access_token\"]}}"
+            }
+          ]
+        },
+        "options": {
+          "timeout": 30000
+        }
+      },
+      "id": "d45ad6c3-f760-4bf7-b885-9f00f6288e73",
+      "name": "Get Domain Search Results",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        960,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Turn Snov's domain-emails response into one item per lead.\n// NOTE: Snov's exact field names can vary slightly by account/plan.\n// After running this once, click on this node's output and check the\n// real field names - adjust the lines below (d.xxx) if needed.\nconst response = $input.first().json;\n\nif (response.status === 'in_progress' || response.data === undefined) {\n  return [{ json: { email: '', note: 'Snov is still processing this search - increase the Wait node duration and try again', raw: response } }];\n}\n\nconst emails = (response.data && response.data.emails) || response.emails || [];\n\nconst leads = [];\nfor (const d of emails) {\n  leads.push({\n    json: {\n      email: d.email || d.value || '',\n      type: d.type || '',\n      sourcePage: d.sourcePage || d.source_page || '',\n      domain: (response.data && response.data.domain) || ''\n    }\n  });\n}\n\nif (leads.length === 0) {\n  return [{ json: { email: '', note: 'No emails found for this domain', raw: response } }];\n}\n\nreturn leads;"
+      },
+      "id": "9b36828f-b3f1-45b7-bf15-84906d4268ba",
+      "name": "Format Leads",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1200,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "value": "YOUR_GOOGLE_SHEET_ID",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "gid=0",
+          "mode": "list",
+          "cachedResultName": "Sheet1"
+        },
+        "columns": {
+          "mappingMode": "autoMapInputData",
+          "value": {},
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "email",
+              "displayName": "email",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "status",
+              "displayName": "status",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "firstName",
+              "displayName": "firstName",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "lastName",
+              "displayName": "lastName",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "position",
+              "displayName": "position",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "company",
+              "displayName": "company",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "sourceUrl",
+              "displayName": "sourceUrl",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "id": "a58d76f6-c164-4281-9677-42c8192f0bad",
+      "name": "Save Enriched Leads to Google Sheets",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [
+        1440,
+        0
+      ]
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Email Finder Form": {
+      "main": [
+        [
+          {
+            "node": "Get Snov Access Token",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Snov Access Token": {
+      "main": [
+        [
+          {
+            "node": "Start Domain Search",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Start Domain Search": {
+      "main": [
+        [
+          {
+            "node": "Wait for Snov to Process",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Wait for Snov to Process": {
+      "main": [
+        [
+          {
+            "node": "Get Domain Search Results",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Domain Search Results": {
+      "main": [
+        [
+          {
+            "node": "Format Leads",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Format Leads": {
+      "main": [
+        [
+          {
+            "node": "Save Enriched Leads to Google Sheets",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "nodeGroups": [],
+  "id": "XyBw6MPhziyTHFxi",
+  "tags": []
+}
