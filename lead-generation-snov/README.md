@@ -1,4 +1,5 @@
 # 🚀 n8n Lead Generation – Email Finder & Enrichment
+![n8n Lead Generation Workflow](workflow.png)
 
 An n8n workflow that accepts a company website, searches the domain for email addresses using Snov.io, formats the results, and saves the leads to Google Sheets.
 
