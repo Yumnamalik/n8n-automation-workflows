@@ -10,6 +10,7 @@ A collection of production-ready n8n automation workflows covering AI agents, le
 | :--- | :--- | :--- | :--- |
 | 🚀 **[Lead Generation with Snov.io](./lead-generation-snov)** | Lead Gen & Outreach | Snov.io, n8n | Automates lead enrichment, email extraction, and prospect list building. |
 | 🤖 **[RAG Chatbot for Company Documents](./rag-chatbot-drive-gemini)** | AI & Knowledge Base | Google Drive, Google Gemini, Pinecone | Ingests company docs from Google Drive, stores embeddings in Pinecone, and powers an AI chat assistant. |
+| 💬 **[WhatsApp Lead Qualifier](./lead-qualifier-whatsapp)** | Lead Gen & AI | Typeform, Google Gemini, WhatsApp | Classifies incoming form leads with Gemini AI and sends tailored WhatsApp responses. |
 
 ---
 
