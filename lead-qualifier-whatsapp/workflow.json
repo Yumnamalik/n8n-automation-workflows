@@ -1,0 +1,427 @@
+{
+  "name": "Lead Qualifier - Classify incoming leads via WhatsApp",
+  "nodes": [
+    {
+      "parameters": {
+        "formId": "fuEJqDiu"
+      },
+      "id": "6c5bf868-e23e-43fa-832b-c0de73447fc3",
+      "name": "Receive New Lead (Typeform)",
+      "type": "n8n-nodes-base.typeformTrigger",
+      "typeVersion": 1,
+      "position": [
+        -976,
+        192
+      ],
+      "webhookId": "98051105-806d-4e17-a45f-bb753a4f7197",
+      "credentials": {
+        "typeformApi": {
+          "id": "ZIxXtmKnjT2PI573",
+          "name": "Typeform account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "p1",
+              "name": "name",
+              "type": "string",
+              "value": "={{$json[\"What's your name?\"]}}"
+            },
+            {
+              "id": "p2",
+              "name": "phone",
+              "type": "string",
+              "value": "={{$json[\"What's your phone number?\"]}}"
+            },
+            {
+              "id": "p3",
+              "name": "email",
+              "type": "string",
+              "value": "={{$json[\"What's your email?\"]}}"
+            },
+            {
+              "id": "p4",
+              "name": "message",
+              "type": "string",
+              "value": "={{$json[\"How can we help you?\"]}}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "bdd4ea10-80c4-4f45-8aad-714965e18c61",
+      "name": "Prepare Lead Data",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        -752,
+        192
+      ]
+    },
+    {
+      "parameters": {
+        "modelName": "models/gemini-3.5-flash",
+        "options": {
+          "temperature": 0.2
+        }
+      },
+      "id": "811a0b76-8b7e-4e7e-859f-b390878a003f",
+      "name": "Google Gemini Chat Model",
+      "type": "@n8n/n8n-nodes-langchain.lmChatGoogleGemini",
+      "typeVersion": 1,
+      "position": [
+        -560,
+        400
+      ],
+      "credentials": {
+        "googlePalmApi": {
+          "id": "qa7FgICTaJDAYAJo",
+          "name": "Google Gemini(PaLM) Api account 2"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "schemaType": "manual",
+        "inputSchema": "{\n  \"type\": \"object\",\n  \"properties\": {\n    \"sentiment\": { \"type\": \"string\", \"enum\": [\"positive\", \"neutral\", \"negative\"] },\n    \"lead_score\": { \"type\": \"number\" },\n    \"reason\": { \"type\": \"string\" }\n  },\n  \"required\": [\"sentiment\", \"lead_score\", \"reason\"]\n}"
+      },
+      "id": "4b8ab6dd-77e1-4593-a895-e4a2daa8dc80",
+      "name": "Structured Output Parser",
+      "type": "@n8n/n8n-nodes-langchain.outputParserStructured",
+      "typeVersion": 1.2,
+      "position": [
+        -416,
+        400
+      ]
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=Classify the sentiment of the message below as Positive, Neutral or Negative, and give it a lead_score from 0-100 (100 = very hot/ready to buy). Message:\n\n\"{{$json.message}}\"",
+        "hasOutputParser": true
+      },
+      "id": "6e6ca4d9-02cf-4154-9d3a-1ef0e1ae228b",
+      "name": "Classify Sentiment",
+      "type": "@n8n/n8n-nodes-langchain.chainLlm",
+      "typeVersion": 1.5,
+      "position": [
+        -560,
+        192
+      ]
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "conditions": [
+                  {
+                    "leftValue": "={{$json.output.sentiment}}",
+                    "rightValue": "positive",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and",
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 1
+                }
+              }
+            },
+            {
+              "conditions": {
+                "conditions": [
+                  {
+                    "leftValue": "={{$json.output.sentiment}}",
+                    "rightValue": "neutral",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and",
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 1
+                }
+              }
+            },
+            {
+              "conditions": {
+                "conditions": [
+                  {
+                    "leftValue": "={{$json.output.sentiment}}",
+                    "rightValue": "negative",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and",
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 1
+                }
+              }
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "2da3c9c3-a8ac-477c-b5df-a53c097b8fe1",
+      "name": "Route by Sentiment",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.2,
+      "position": [
+        -192,
+        192
+      ]
+    },
+    {
+      "parameters": {
+        "tableId": "leads"
+      },
+      "id": "cebef171-82a4-4506-98f6-2b7836784430",
+      "name": "Store Hot Lead",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        48,
+        0
+      ],
+      "credentials": {
+        "supabaseApi": {
+          "id": "lr0vdDep2K8Hgd7U",
+          "name": "Supabase account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "tableId": "leads"
+      },
+      "id": "4aac666c-cb70-4fae-971f-680640bf3b85",
+      "name": "Store Neutral Lead",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        48,
+        192
+      ],
+      "credentials": {
+        "supabaseApi": {
+          "id": "lr0vdDep2K8Hgd7U",
+          "name": "Supabase account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "tableId": "leads"
+      },
+      "id": "c7ceb220-f2cd-42f3-a96d-1a3e28c20904",
+      "name": "Store Cold Lead",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        48,
+        368
+      ],
+      "credentials": {
+        "supabaseApi": {
+          "id": "lr0vdDep2K8Hgd7U",
+          "name": "Supabase account"
+        }
+      }
+    },
+    {
+      "parameters": {},
+      "id": "bd0b83f6-4bbc-415f-880f-695285e12bf6",
+      "name": "Combine Lead Data",
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3.1,
+      "position": [
+        288,
+        192
+      ]
+    },
+    {
+      "parameters": {
+        "phoneNumberId": "=1329528700237677",
+        "recipientPhoneNumber": "= {{$('Prepare Lead Data').item.json.phone}}",
+        "template": "hello_world|en_US"
+      },
+      "id": "736dc62c-1a76-48ea-bdbe-a71abc2a360d",
+      "name": "Send WhatsApp Message",
+      "type": "n8n-nodes-base.whatsApp",
+      "typeVersion": 1,
+      "position": [
+        512,
+        192
+      ],
+      "webhookId": "fb0f5ace-5287-453e-98b1-358027072785",
+      "credentials": {
+        "whatsAppApi": {
+          "id": "zEKwXoKwUdiXw7UX",
+          "name": "WhatsApp account"
+        }
+      }
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Receive New Lead (Typeform)": {
+      "main": [
+        [
+          {
+            "node": "Prepare Lead Data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare Lead Data": {
+      "main": [
+        [
+          {
+            "node": "Classify Sentiment",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Google Gemini Chat Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Classify Sentiment",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Structured Output Parser": {
+      "ai_outputParser": [
+        [
+          {
+            "node": "Classify Sentiment",
+            "type": "ai_outputParser",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Classify Sentiment": {
+      "main": [
+        [
+          {
+            "node": "Route by Sentiment",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Route by Sentiment": {
+      "main": [
+        [
+          {
+            "node": "Store Hot Lead",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Store Neutral Lead",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Store Cold Lead",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Store Hot Lead": {
+      "main": [
+        [
+          {
+            "node": "Combine Lead Data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Store Neutral Lead": {
+      "main": [
+        [
+          {
+            "node": "Combine Lead Data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Store Cold Lead": {
+      "main": [
+        [
+          {
+            "node": "Combine Lead Data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Combine Lead Data": {
+      "main": [
+        [
+          {
+            "node": "Send WhatsApp Message",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "versionId": "a5912c20-8ce8-49b6-9b51-b98e4d597552",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "ffdbd03ef67918b99afd27ccd839d07eec8aaa10ba928817686b7f771d34ed4e"
+  },
+  "nodeGroups": [],
+  "id": "81qyALtg1ImJgWDA",
+  "tags": []
+}
